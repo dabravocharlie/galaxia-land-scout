@@ -1,0 +1,70 @@
+/* ===================================================================
+   GALAXIA LAND SCOUT — Design tokens
+   Subject: a working ledger for tracking tax-deed land and cheap parcels.
+   Feel: courthouse record room crossed with a trading terminal.
+   Not a marketing page — built for daily scanning, dense and fast.
+   =================================================================== */
+
+:root {
+  /* Palette */
+  --ink: #1A1C1A;            /* near-black charcoal, primary background */
+  --ink-raised: #232520;     /* slightly lifted panel background */
+  --ink-line: #34362F;       /* hairline borders on dark */
+  --parchment: #E8E4D9;      /* primary text, ledger-paper off-white */
+  --parchment-dim: #A8A395;  /* secondary text */
+  --brass: #B8893F;          /* accent: flags, links, active state */
+  --brass-dim: #8C6B33;
+  --sage: #7A8B6F;           /* reviewed / settled status */
+  --rust: #A8502E;           /* flagged / under-threshold stamp */
+  --rust-bright: #C96A45;
+
+  /* Type */
+  --font-display: 'Spectral', Georgia, serif;
+  --font-serif: 'Source Serif 4', Georgia, serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+  --font-ui: 'Inter', -apple-system, sans-serif;
+
+  --radius: 2px; /* sharp, ledger-like; not rounded */
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--ink);
+  color: var(--parchment);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a { color: var(--brass); }
+
+::selection {
+  background: var(--brass-dim);
+  color: var(--ink);
+}
+
+/* Visible keyboard focus, always */
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Scrollbar — keep it quiet and in-palette */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ink); }
+::-webkit-scrollbar-thumb { background: var(--ink-line); border-radius: var(--radius); }
+::-webkit-scrollbar-thumb:hover { background: var(--brass-dim); }

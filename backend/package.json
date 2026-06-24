@@ -1,0 +1,24 @@
+{
+  "name": "galaxia-land-scout-api",
+  "version": "1.0.0",
+  "description": "Backend API for Galaxia Land Scout - tracks cheap land listings across GA/AL/MS",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "db:init": "node db/init.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.12.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "node-cron": "^3.0.3",
+    "@sendgrid/mail": "^8.1.3",
+    "node-fetch": "^3.3.2",
+    "cheerio": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
