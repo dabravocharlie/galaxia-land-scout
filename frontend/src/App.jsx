@@ -83,38 +83,82 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', padding: '32px 24px 60px' }}>
       <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-        {/* Header */}
-        <header style={{ marginBottom: 24 }}>
-          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--brass)', marginBottom: 8 }}>
-            Galaxia Investment
+        {/* LCARS header bar */}
+        <header style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'stretch', gap: 8, marginBottom: 10 }}>
+            {/* Left elbow block */}
+            <div style={{
+              background: 'var(--brass)', borderTopLeftRadius: 24, borderBottomLeftRadius: 24,
+              borderTopRightRadius: 8, borderBottomRightRadius: 8,
+              width: 120, minHeight: 56, display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end',
+              padding: '0 14px 8px 0',
+            }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink)', letterSpacing: '0.05em' }}>
+                LCARS 47
+              </span>
+            </div>
+            {/* Title block */}
+            <div style={{
+              flex: 1, background: 'var(--ink-raised)', borderRadius: 8,
+              display: 'flex', alignItems: 'center', padding: '0 20px',
+              border: '1px solid var(--ink-line)',
+            }}>
+              <div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--brass)' }}>
+                  Galaxia Investment
+                </div>
+                <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, margin: 0, color: 'var(--parchment)', letterSpacing: '0.06em', textShadow: '0 0 18px rgba(255,159,85,0.35)' }}>
+                  COMMAND CENTER
+                </h1>
+              </div>
+              <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--sage)' }}>
+                  <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--sage)', marginRight: 6, animation: 'lcars-pulse 2s infinite' }} />
+                  ALL SYSTEMS ONLINE
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--parchment-dim)', marginTop: 4 }}>
+                  4 MODULES ACTIVE
+                </div>
+              </div>
+            </div>
+            {/* Right cap */}
+            <div style={{
+              background: 'var(--lcars-lilac)', borderTopRightRadius: 24, borderBottomRightRadius: 24,
+              borderTopLeftRadius: 8, borderBottomLeftRadius: 8, width: 60, minHeight: 56,
+            }} />
           </div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 38, fontWeight: 600, margin: 0, color: 'var(--parchment)' }}>
-            Investment Ledger
-          </h1>
         </header>
 
-        {/* Tab nav */}
-        <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--ink-line)', marginBottom: 28 }}>
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                borderBottom: tab === t.id ? '2px solid var(--brass)' : '2px solid transparent',
-                color: tab === t.id ? 'var(--parchment)' : 'var(--parchment-dim)',
-                fontFamily: 'var(--font-display)',
-                fontSize: 18,
-                fontWeight: 600,
-                padding: '8px 16px',
-                cursor: 'pointer',
-                marginBottom: -1,
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* LCARS tab nav — rounded pills, active one glows amber */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 26, flexWrap: 'wrap' }}>
+          {TABS.map((t, idx) => {
+            const active = tab === t.id;
+            const palette = ['var(--brass)', 'var(--lcars-blue)', 'var(--lcars-gold)', 'var(--lcars-lilac)'];
+            const c = palette[idx % palette.length];
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                style={{
+                  background: active ? c : 'var(--ink-raised)',
+                  border: `1px solid ${active ? c : 'var(--ink-line)'}`,
+                  borderRadius: 18,
+                  color: active ? 'var(--ink)' : 'var(--parchment-dim)',
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  padding: '9px 22px',
+                  cursor: 'pointer',
+                  boxShadow: active ? `0 0 16px ${c}` : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Active module */}
@@ -123,8 +167,8 @@ export default function App() {
         {tab === 'tech' && <TechStocks />}
         {tab === 'biz' && <BusinessList />}
 
-        <footer style={{ marginTop: 40, paddingTop: 20, borderTop: '1px solid var(--ink-line)', fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--parchment-dim)' }}>
-          Galaxia Investment · land scout + tech radar · automated research
+        <footer style={{ marginTop: 40, paddingTop: 16, borderTop: '1px solid var(--ink-line)', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.05em', color: 'var(--parchment-dim)' }}>
+          GALAXIA COMMAND CENTER &middot; STARDATE {new Date().toISOString().slice(0,10)} &middot; LAND / TECH / BUSINESS / MINERVA
         </footer>
       </div>
     </div>

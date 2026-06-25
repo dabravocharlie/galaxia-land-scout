@@ -1,30 +1,43 @@
 /* ===================================================================
-   GALAXIA LAND SCOUT — Design tokens
-   Subject: a working ledger for tracking tax-deed land and cheap parcels.
-   Feel: courthouse record room crossed with a trading terminal.
-   Not a marketing page — built for daily scanning, dense and fast.
+   GALAXIA COMMAND CENTER — LCARS theme
+   Star Trek "Library Computer Access/Retrieval System" look:
+   pure-black background, rounded color-block panels, amber/orange/lilac/blue
+   palette, condensed techy type. Token NAMES are unchanged from the original
+   ledger theme so every component reskins automatically; only the VALUES and
+   fonts change here.
    =================================================================== */
 
 :root {
-  /* Palette */
-  --ink: #1A1C1A;            /* near-black charcoal, primary background */
-  --ink-raised: #232520;     /* slightly lifted panel background */
-  --ink-line: #34362F;       /* hairline borders on dark */
-  --parchment: #E8E4D9;      /* primary text, ledger-paper off-white */
-  --parchment-dim: #A8A395;  /* secondary text */
-  --brass: #B8893F;          /* accent: flags, links, active state */
-  --brass-dim: #8C6B33;
-  --sage: #7A8B6F;           /* reviewed / settled status */
-  --rust: #A8502E;           /* flagged / under-threshold stamp */
-  --rust-bright: #C96A45;
+  /* Backgrounds — LCARS is near-pure black */
+  --ink: #000000;            /* primary background */
+  --ink-raised: #14141C;     /* lifted panel background (very dark blue-black) */
+  --ink-line: #3A4A6B;       /* panel divider / hairline (muted steel blue) */
 
-  /* Type */
-  --font-display: 'Spectral', Georgia, serif;
-  --font-serif: 'Source Serif 4', Georgia, serif;
-  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
-  --font-ui: 'Inter', -apple-system, sans-serif;
+  /* Text */
+  --parchment: #E6EDFF;      /* primary text, cool white */
+  --parchment-dim: #8FA6C8;  /* secondary text, steel blue-grey */
 
-  --radius: 2px; /* sharp, ledger-like; not rounded */
+  /* Accents — classic LCARS amber/orange as the primary "brass" accent */
+  --brass: #FF9F55;          /* LCARS amber/orange — primary accent */
+  --brass-dim: #CC7A33;      /* darker amber */
+
+  /* Status colors mapped to LCARS hues */
+  --sage: #66CC99;           /* "reviewed/settled" -> aqua green */
+  --rust: #CC6677;           /* "flagged" -> LCARS red/salmon */
+  --rust-bright: #FF6B81;    /* bright alert salmon */
+
+  /* Extra LCARS hues available if needed */
+  --lcars-lilac: #CC99CC;
+  --lcars-blue: #9999FF;
+  --lcars-gold: #FFCC66;
+
+  /* Type — condensed, futuristic */
+  --font-display: 'Orbitron', 'Arial Narrow', sans-serif;   /* headers, the LCARS feel */
+  --font-serif: 'Rajdhani', 'Arial Narrow', sans-serif;     /* body (reusing the serif slot) */
+  --font-mono: 'Share Tech Mono', 'JetBrains Mono', monospace;
+  --font-ui: 'Rajdhani', 'Arial Narrow', sans-serif;
+
+  --radius: 14px; /* LCARS is all rounded pills/blocks */
 }
 
 * { box-sizing: border-box; }
@@ -38,22 +51,22 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-#root {
-  min-height: 100vh;
+/* Subtle HUD grid wash over the black background */
+body {
+  background-image:
+    linear-gradient(rgba(255,159,85,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,159,85,0.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+  background-attachment: fixed;
 }
+
+#root { min-height: 100vh; }
 
 a { color: var(--brass); }
 
-::selection {
-  background: var(--brass-dim);
-  color: var(--ink);
-}
+::selection { background: var(--brass); color: var(--ink); }
 
-/* Visible keyboard focus, always */
-:focus-visible {
-  outline: 2px solid var(--brass);
-  outline-offset: 2px;
-}
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -63,8 +76,14 @@ a { color: var(--brass); }
   }
 }
 
-/* Scrollbar — keep it quiet and in-palette */
+/* Scrollbar in LCARS amber */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: var(--ink); }
-::-webkit-scrollbar-thumb { background: var(--ink-line); border-radius: var(--radius); }
-::-webkit-scrollbar-thumb:hover { background: var(--brass-dim); }
+::-webkit-scrollbar-track { background: #0A0A12; }
+::-webkit-scrollbar-thumb { background: var(--brass-dim); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: var(--brass); }
+
+/* Reusable LCARS glow utility (used via inline style boxShadow too) */
+@keyframes lcars-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}

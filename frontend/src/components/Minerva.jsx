@@ -141,7 +141,8 @@ export default function Minerva() {
       <div
         ref={scrollRef}
         style={{
-          border: '1px solid var(--ink-line)', background: 'var(--ink-raised)',
+          border: '1px solid var(--brass)', background: 'var(--ink-raised)',
+          borderRadius: 16, boxShadow: '0 0 24px rgba(255,159,85,0.15), inset 0 0 40px rgba(0,0,0,0.5)',
           height: 440, overflowY: 'auto', padding: 20, marginBottom: 14,
         }}
       >

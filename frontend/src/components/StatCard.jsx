@@ -5,6 +5,8 @@ export default function StatCard({ label, value, accent }) {
       style={{
         background: 'var(--ink-raised)',
         border: '1px solid var(--ink-line)',
+        borderLeft: `4px solid ${accent || 'var(--brass)'}`,
+        borderRadius: 12,
         padding: '16px 20px',
         minWidth: 120,
       }}
