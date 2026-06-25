@@ -11,11 +11,26 @@
 const { runTrackedJob, upsertBusiness } = require('./jobHelpers');
 
 const PRICE_CEILING = 50000;
-const MAX_PAGES = 10;
+const MAX_PAGES = 5; // ultra_premium costs ~30 credits/page; keep modest
 const STATE = 'GA';
 const STATE_SLUG = 'georgia';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
+
+// BizBuySell blocks datacenter IPs (403), so we route through ScraperAPI's
+// ultra_premium residential pool (requires a PAID ScraperAPI plan). Requires
+// SCRAPERAPI_KEY env var. render=false keeps credit cost down since the
+// listings are in the static HTML and don't need JS rendering.
+function viaScraperApi(targetUrl) {
+  const key = process.env.SCRAPERAPI_KEY;
+  if (!key) return null;
+  const params = new URLSearchParams({
+    api_key: key,
+    url: targetUrl,
+    ultra_premium: 'true',
+  });
+  return `https://api.scraperapi.com/?${params.toString()}`;
+}
 
 function pageUrl(n) {
   return n === 1
@@ -121,7 +136,9 @@ function extractFromHtml($) {
 }
 
 async function fetchPage(url, fetch) {
-  const res = await fetch(url, { headers: { 'User-Agent': UA, 'Accept': 'text/html' }, timeout: 25000 });
+  const wrapped = viaScraperApi(url);
+  if (!wrapped) throw new Error('SCRAPERAPI_KEY not set');
+  const res = await fetch(wrapped, { headers: { 'User-Agent': UA, 'Accept': 'text/html' }, timeout: 70000 });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.text();
 }

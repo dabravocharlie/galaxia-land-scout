@@ -49,5 +49,7 @@ export const api = {
   },
   getBusinessStats: () => request('/api/businesses/stats/summary'),
   updateBusiness: (id, updates) =>
-    request(`/api/businesses/${id}`, { method: 'PATCH', body: JSON.stringify(updates) })
+    request(`/api/businesses/${id}`, { method: 'PATCH', body: JSON.stringify(updates) }),
+  askMinerva: (question, history) =>
+    request('/api/minerva/ask', { method: 'POST', body: JSON.stringify({ question, history }) })
 };

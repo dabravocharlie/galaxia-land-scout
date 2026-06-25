@@ -7,8 +7,10 @@ import ListingsTable from './components/ListingsTable';
 import CountyWatch from './components/CountyWatch';
 import TechStocks from './components/TechStocks';
 import BusinessList from './components/BusinessList';
+import Minerva from './components/Minerva';
 
 const TABS = [
+  { id: 'minerva', label: 'Minerva' },
   { id: 'land', label: 'Land Scout' },
   { id: 'tech', label: 'Tech Stocks' },
   { id: 'biz', label: 'Businesses' },
@@ -76,7 +78,7 @@ function LandModule() {
 }
 
 export default function App() {
-  const [tab, setTab] = useState('land');
+  const [tab, setTab] = useState('minerva');
 
   return (
     <div style={{ minHeight: '100vh', padding: '32px 24px 60px' }}>
@@ -116,6 +118,7 @@ export default function App() {
         </div>
 
         {/* Active module */}
+        {tab === 'minerva' && <Minerva />}
         {tab === 'land' && <LandModule />}
         {tab === 'tech' && <TechStocks />}
         {tab === 'biz' && <BusinessList />}

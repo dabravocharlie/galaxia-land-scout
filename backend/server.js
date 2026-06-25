@@ -10,6 +10,7 @@ const countiesRouter = require('./routes/counties');
 const emailsRouter = require('./routes/emails');
 const techStocksRouter = require('./routes/techstocks');
 const businessesRouter = require('./routes/businesses');
+const minervaRouter = require('./routes/minerva');
 const { startScheduler } = require('./jobs/scheduler');
 
 const app = express();
@@ -33,6 +34,7 @@ app.use('/api/counties', countiesRouter);
 app.use('/api/emails', emailsRouter);
 app.use('/api/techstocks', techStocksRouter);
 app.use('/api/businesses', businessesRouter);
+app.use('/api/minerva', minervaRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
