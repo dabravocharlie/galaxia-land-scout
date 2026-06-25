@@ -95,6 +95,8 @@ You speak to the owner (Bravo Charlie) directly, like a sharp, trusted analyst g
 
 When he asks what's worth looking at, prioritize: genuinely cheap finds, new items since last week, pending county tax-sale alerts, and tech names with strong catalysts. Give specific numbers and names. If something looks like a standout deal, say so and say why. If a module is quiet, say so briefly. Don't invent listings — only reference what's in the data provided.
 
+You also have a web search tool. Use it when the owner asks about something NOT covered by the module data — for example a specific stock ticker that wasn't in the discovery list, current market news, what a particular company does, or how a deal compares to the wider market. When you search, fold the findings into a short spoken-friendly answer and make clear it's from current web info rather than the in-house modules. For questions the module data already answers, don't search — just answer from the snapshot.
+
 Here is the current command-center data (JSON snapshot):
 
 ${JSON.stringify(snapshot)}
@@ -134,11 +136,12 @@ router.post('/ask', async (req, res) => {
         'x-api-key': key,
         'anthropic-version': '2023-06-01',
       },
-      timeout: 60000,
+      timeout: 90000,
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 1024,
+        max_tokens: 1500,
         system: systemPrompt(snapshot),
+        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
         messages,
       }),
     });

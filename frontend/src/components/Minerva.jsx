@@ -23,9 +23,41 @@ export default function Minerva() {
   const [listening, setListening] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
   const [voiceSupported, setVoiceSupported] = useState(true);
+  const [voices, setVoices] = useState([]);
+  const [selectedVoice, setSelectedVoice] = useState('');
 
   const recognitionRef = useRef(null);
   const scrollRef = useRef(null);
+
+  // Load available TTS voices and auto-pick the most natural-sounding one.
+  // Browsers load voices asynchronously, so we listen for the change event.
+  useEffect(() => {
+    if (!window.speechSynthesis) return;
+    const pickBest = (list) => {
+      const prefer = [
+        /Google US English/i,
+        /Microsoft.*(Natural|Aria|Jenny|Guy|Ava|Emma)/i,
+        /Samantha/i,
+        /Google.*English/i,
+        /Microsoft.*English/i,
+      ];
+      for (const pat of prefer) {
+        const hit = list.find(v => pat.test(v.name) && /en/i.test(v.lang));
+        if (hit) return hit.name;
+      }
+      const anyEn = list.find(v => /en/i.test(v.lang));
+      return anyEn ? anyEn.name : (list[0] && list[0].name) || '';
+    };
+    const loadVoices = () => {
+      const list = window.speechSynthesis.getVoices();
+      if (list.length === 0) return;
+      setVoices(list);
+      setSelectedVoice(prev => prev || pickBest(list));
+    };
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    return () => { if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = null; };
+  }, []);
 
   // Set up speech recognition once
   useEffect(() => {
@@ -57,8 +89,12 @@ export default function Minerva() {
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1.0;
     u.pitch = 1.0;
+    if (selectedVoice) {
+      const v = window.speechSynthesis.getVoices().find(x => x.name === selectedVoice);
+      if (v) u.voice = v;
+    }
     window.speechSynthesis.speak(u);
-  }, [voiceOn]);
+  }, [voiceOn, selectedVoice]);
 
   const send = useCallback(async (text) => {
     const question = (text || '').trim();
@@ -189,11 +225,35 @@ export default function Minerva() {
       </div>
 
       {/* Voice controls */}
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: 12 }}>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         <label style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--parchment-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
           <input type="checkbox" checked={voiceOn} onChange={(e) => setVoiceOn(e.target.checked)} />
           Speak replies aloud
         </label>
+
+        {voices.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--parchment-dim)' }}>Voice:</span>
+            <select
+              value={selectedVoice}
+              onChange={(e) => setSelectedVoice(e.target.value)}
+              style={{
+                background: 'var(--ink-raised)', border: '1px solid var(--ink-line)', color: 'var(--parchment)',
+                fontFamily: 'var(--font-ui)', fontSize: 12, padding: '5px 8px', borderRadius: 2, maxWidth: 220,
+              }}
+            >
+              {voices.filter(v => /en/i.test(v.lang)).map(v => (
+                <option key={v.name} value={v.name}>{v.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => { setVoiceOn(true); speak("Hello, I'm Minerva. This is how I sound."); }}
+              style={{ background: 'transparent', border: '1px solid var(--brass)', color: 'var(--brass)', fontFamily: 'var(--font-ui)', fontSize: 11, padding: '4px 8px', borderRadius: 2, cursor: 'pointer' }}>
+              preview
+            </button>
+          </div>
+        )}
+
         <button onClick={stopSpeaking}
           style={{ background: 'transparent', border: 'none', color: 'var(--brass)', fontFamily: 'var(--font-ui)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
           Stop speaking
