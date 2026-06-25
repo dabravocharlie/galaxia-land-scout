@@ -168,6 +168,41 @@ CREATE TABLE IF NOT EXISTS businesses (
 CREATE INDEX IF NOT EXISTS idx_businesses_status ON businesses(status);
 CREATE INDEX IF NOT EXISTS idx_businesses_price ON businesses(price);
 CREATE INDEX IF NOT EXISTS idx_businesses_found ON businesses(date_found);
+
+-- Portfolio watchlist: the fixed set of tickers the owner holds/follows.
+-- Editable from the dashboard. Seeded with the original Stock News Bot list.
+CREATE TABLE IF NOT EXISTS watchlist (
+  id SERIAL PRIMARY KEY,
+  ticker TEXT NOT NULL,
+  note TEXT,                          -- optional user label, e.g. "monthly dividend"
+  added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(ticker)
+);
+
+-- Latest AI news summary per ticker (one current row per ticker, refreshed
+-- each run). Keeps a short summary + when it was last updated.
+CREATE TABLE IF NOT EXISTS watchlist_news (
+  id SERIAL PRIMARY KEY,
+  ticker TEXT NOT NULL,
+  summary TEXT,                       -- AI-written news summary
+  sentiment TEXT,                     -- 'positive' | 'neutral' | 'negative' | null
+  source_url TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  emailed BOOLEAN NOT NULL DEFAULT FALSE,
+  UNIQUE(ticker)
+);
+
+-- Seed the watchlist with the original Stock News Bot tickers (idempotent).
+INSERT INTO watchlist (ticker, note) VALUES
+  ('AGNC', 'monthly dividend'),
+  ('HRZN', 'monthly dividend'),
+  ('SCHD', 'dividend ETF'),
+  ('QQQM', 'growth ETF'),
+  ('ARR',  'monthly dividend'),
+  ('EFC',  'monthly dividend'),
+  ('SPMO', 'momentum ETF'),
+  ('TOPT', 'ETF')
+ON CONFLICT (ticker) DO NOTHING;
 `;
 
 async function init() {

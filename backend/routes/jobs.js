@@ -10,6 +10,7 @@ const { trackTaxSales } = require('../jobs/taxSaleTracker');
 const { debugRetail } = require('../jobs/retailDebug');
 const { discoverTechStocks } = require('../jobs/techDiscovery');
 const { scrapeBusinesses, debugBusinesses } = require('../jobs/businesses');
+const { refreshPortfolioNews } = require('../jobs/portfolio');
 
 const JOB_MAP = {
   govease: scrapeGovEase,
@@ -19,7 +20,8 @@ const JOB_MAP = {
   land_com: scrapeLandCom,
   tax_sale_tracker: trackTaxSales,
   tech_discovery: discoverTechStocks,
-  businesses: scrapeBusinesses
+  businesses: scrapeBusinesses,
+  portfolio: refreshPortfolioNews
 };
 
 // GET /api/jobs/debug/businesses — diagnostic for the BizBuySell scraper

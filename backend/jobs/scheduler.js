@@ -19,6 +19,8 @@ const { discoverTechStocks } = require('./techDiscovery');
 const { sendTechDigest } = require('../emails/techDigest');
 const { scrapeBusinesses } = require('./businesses');
 const { sendBusinessDigest } = require('../emails/businessDigest');
+const { refreshPortfolioNews } = require('./portfolio');
+const { sendPortfolioDigest } = require('../emails/portfolioDigest');
 // const { sendTrackerAlert } = require('../emails/trackerAlert'); // TODO: build with email layer
 // const { sendWeeklyDigest } = require('../emails/weeklyDigest'); // TODO: build with email layer
 
@@ -32,6 +34,17 @@ function startScheduler() {
       await sendTrackerAlert();
     } catch (err) {
       console.error('[scheduler] Tax sale tracker failed:', err.message);
+    }
+  });
+
+  // Portfolio news - Mon/Wed/Fri at 7:30 AM server time (like the old Stock News Bot)
+  cron.schedule('30 7 * * 1,3,5', async () => {
+    console.log('[scheduler] Running portfolio news...');
+    try {
+      await refreshPortfolioNews();
+      await sendPortfolioDigest();
+    } catch (err) {
+      console.error('[scheduler] Portfolio news failed:', err.message);
     }
   });
 

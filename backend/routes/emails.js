@@ -6,6 +6,7 @@ const { sendWeeklyDigest } = require('../emails/weeklyDigest');
 const { sendTrackerAlert } = require('../emails/trackerAlert');
 const { sendTechDigest } = require('../emails/techDigest');
 const { sendBusinessDigest } = require('../emails/businessDigest');
+const { sendPortfolioDigest } = require('../emails/portfolioDigest');
 
 // POST /api/emails/send/digest — send the weekly digest now
 router.post('/send/digest', async (req, res) => {
@@ -44,6 +45,16 @@ router.post('/send/business', async (req, res) => {
     res.json({ email: 'business_digest', ...result });
   } catch (err) {
     res.status(500).json({ email: 'business_digest', error: err.message });
+  }
+});
+
+// POST /api/emails/send/portfolio — send the portfolio news digest now
+router.post('/send/portfolio', async (req, res) => {
+  try {
+    const result = await sendPortfolioDigest();
+    res.json({ email: 'portfolio_digest', ...result });
+  } catch (err) {
+    res.status(500).json({ email: 'portfolio_digest', error: err.message });
   }
 });
 

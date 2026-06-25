@@ -51,5 +51,10 @@ export const api = {
   updateBusiness: (id, updates) =>
     request(`/api/businesses/${id}`, { method: 'PATCH', body: JSON.stringify(updates) }),
   askMinerva: (question, history) =>
-    request('/api/minerva/ask', { method: 'POST', body: JSON.stringify({ question, history }) })
+    request('/api/minerva/ask', { method: 'POST', body: JSON.stringify({ question, history }) }),
+  getPortfolio: () => request('/api/portfolio'),
+  addTicker: (ticker, note) =>
+    request('/api/portfolio', { method: 'POST', body: JSON.stringify({ ticker, note }) }),
+  removeTicker: (ticker) =>
+    request(`/api/portfolio/${ticker}`, { method: 'DELETE' })
 };

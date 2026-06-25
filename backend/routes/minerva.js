@@ -82,14 +82,24 @@ async function buildSnapshot() {
   `);
   snapshot.businesses = { stats: bizStats.rows[0], cheapest: bizCheapest.rows };
 
+  // --- Portfolio (watchlist holdings + latest news) ---
+  const portfolio = await pool.query(`
+    SELECT w.ticker, w.note, n.summary, n.sentiment, n.updated_at
+    FROM watchlist w
+    LEFT JOIN watchlist_news n ON n.ticker = w.ticker
+    ORDER BY w.ticker
+  `);
+  snapshot.portfolio = { holdings: portfolio.rows };
+
   return snapshot;
 }
 
 function systemPrompt(snapshot) {
-  return `You are Minerva, the manager and analyst for Galaxia Investment's automated research command center. You oversee three intelligence modules:
+  return `You are Minerva, the manager and analyst for Galaxia Investment's automated research command center. You oversee these intelligence modules:
   - LAND SCOUT: cheap land/property listings across GA/AL/MS (Craigslist) + a Georgia county tax-sale tracker
   - TECH STOCKS: notable technology stocks surfaced weekly
   - BUSINESSES: cheap businesses for sale in Georgia (under $50k, from BizBuySell)
+  - PORTFOLIO: the owner's own stock watchlist/holdings with the latest news on each
 
 You speak to the owner (Bravo Charlie) directly, like a sharp, trusted analyst giving a briefing. Be concise and conversational — this may be read aloud by a voice system, so avoid tables, markdown headers, bullet symbols, and long URLs. Use natural spoken phrasing and short paragraphs. Lead with what's most worth his attention.
 
