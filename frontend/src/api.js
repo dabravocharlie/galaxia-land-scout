@@ -40,5 +40,14 @@ export const api = {
   },
   getTechStats: () => request('/api/techstocks/stats/summary'),
   updateTechStock: (id, updates) =>
-    request(`/api/techstocks/${id}`, { method: 'PATCH', body: JSON.stringify(updates) })
+    request(`/api/techstocks/${id}`, { method: 'PATCH', body: JSON.stringify(updates) }),
+  getBusinesses: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== ''))
+    ).toString();
+    return request(`/api/businesses${qs ? `?${qs}` : ''}`);
+  },
+  getBusinessStats: () => request('/api/businesses/stats/summary'),
+  updateBusiness: (id, updates) =>
+    request(`/api/businesses/${id}`, { method: 'PATCH', body: JSON.stringify(updates) })
 };

@@ -6,10 +6,12 @@ import FilterBar from './components/FilterBar';
 import ListingsTable from './components/ListingsTable';
 import CountyWatch from './components/CountyWatch';
 import TechStocks from './components/TechStocks';
+import BusinessList from './components/BusinessList';
 
 const TABS = [
   { id: 'land', label: 'Land Scout' },
   { id: 'tech', label: 'Tech Stocks' },
+  { id: 'biz', label: 'Businesses' },
 ];
 
 function LandModule() {
@@ -114,7 +116,9 @@ export default function App() {
         </div>
 
         {/* Active module */}
-        {tab === 'land' ? <LandModule /> : <TechStocks />}
+        {tab === 'land' && <LandModule />}
+        {tab === 'tech' && <TechStocks />}
+        {tab === 'biz' && <BusinessList />}
 
         <footer style={{ marginTop: 40, paddingTop: 20, borderTop: '1px solid var(--ink-line)', fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--parchment-dim)' }}>
           Galaxia Investment · land scout + tech radar · automated research

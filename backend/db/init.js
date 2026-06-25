@@ -137,6 +137,37 @@ CREATE TABLE IF NOT EXISTS tech_stocks (
 
 CREATE INDEX IF NOT EXISTS idx_tech_stocks_status ON tech_stocks(status);
 CREATE INDEX IF NOT EXISTS idx_tech_stocks_seen ON tech_stocks(last_seen_at);
+
+-- Businesses for sale: cheap small businesses scraped from BizBuySell (GA,
+-- under a price ceiling). Discovery + monitoring, deduped by source listing id.
+CREATE TABLE IF NOT EXISTS businesses (
+  id SERIAL PRIMARY KEY,
+  source TEXT NOT NULL,              -- 'bizbuysell'
+  source_url TEXT NOT NULL,
+  external_id TEXT,                  -- source's listing id, for dedup
+
+  state TEXT,
+  location TEXT,                     -- city/county text as shown
+  title TEXT,
+  description TEXT,
+  price NUMERIC,                     -- asking price
+  cash_flow NUMERIC,                 -- reported cash flow / SDE if present
+  category TEXT,                     -- 'established' | 'asset_sale' | 'startup' | 'real_estate' | etc
+
+  date_found TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  date_last_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  status TEXT NOT NULL DEFAULT 'new',  -- 'new' | 'watching' | 'reviewed' | 'dismissed'
+  notes TEXT,
+  emailed BOOLEAN NOT NULL DEFAULT FALSE,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(source, external_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_businesses_status ON businesses(status);
+CREATE INDEX IF NOT EXISTS idx_businesses_price ON businesses(price);
+CREATE INDEX IF NOT EXISTS idx_businesses_found ON businesses(date_found);
 `;
 
 async function init() {

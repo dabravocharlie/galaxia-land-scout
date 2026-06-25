@@ -68,4 +68,34 @@ async function upsertListing(listing) {
   return result.rows[0].inserted;
 }
 
-module.exports = { runTrackedJob, upsertListing };
+/**
+ * Upserts a business listing. Returns true if newly inserted, false if it
+ * already existed (and was refreshed).
+ */
+async function upsertBusiness(biz) {
+  const {
+    source, source_url, external_id, state, location,
+    title, description, price, cash_flow, category
+  } = biz;
+
+  const result = await pool.query(
+    `INSERT INTO businesses (
+       source, source_url, external_id, state, location,
+       title, description, price, cash_flow, category
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     ON CONFLICT (source, external_id)
+     DO UPDATE SET
+       date_last_seen = NOW(),
+       price = EXCLUDED.price,
+       title = EXCLUDED.title,
+       location = COALESCE(EXCLUDED.location, businesses.location)
+     RETURNING (xmax = 0) AS inserted`,
+    [source, source_url, external_id, state, location || null,
+     title, description || null, price, cash_flow || null, category || null]
+  );
+
+  return result.rows[0].inserted;
+}
+
+module.exports = { runTrackedJob, upsertListing, upsertBusiness };

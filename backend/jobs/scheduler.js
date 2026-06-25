@@ -17,6 +17,8 @@ const { sendWeeklyDigest } = require('../emails/weeklyDigest');
 const { sendTrackerAlert } = require('../emails/trackerAlert');
 const { discoverTechStocks } = require('./techDiscovery');
 const { sendTechDigest } = require('../emails/techDigest');
+const { scrapeBusinesses } = require('./businesses');
+const { sendBusinessDigest } = require('../emails/businessDigest');
 // const { sendTrackerAlert } = require('../emails/trackerAlert'); // TODO: build with email layer
 // const { sendWeeklyDigest } = require('../emails/weeklyDigest'); // TODO: build with email layer
 
@@ -62,7 +64,18 @@ function startScheduler() {
     }
   });
 
-  console.log('✅ Scheduler started: tracker Mon/Wed/Fri @ 7am, Craigslist+digest Mon @ 7am, tech discovery+digest Mon @ 8am');
+  // Cheap businesses scrape + digest - weekly, Monday 9:00 AM server time
+  cron.schedule('0 9 * * 1', async () => {
+    console.log('[scheduler] Running weekly businesses scrape...');
+    try {
+      await scrapeBusinesses();
+      await sendBusinessDigest();
+    } catch (err) {
+      console.error('[scheduler] Businesses scrape failed:', err.message);
+    }
+  });
+
+  console.log('✅ Scheduler started: tracker Mon/Wed/Fri @ 7am, Craigslist+digest Mon @ 7am, tech Mon @ 8am, businesses Mon @ 9am');
 }
 
 module.exports = { startScheduler };

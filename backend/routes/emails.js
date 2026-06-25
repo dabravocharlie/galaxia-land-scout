@@ -5,6 +5,7 @@ const router = express.Router();
 const { sendWeeklyDigest } = require('../emails/weeklyDigest');
 const { sendTrackerAlert } = require('../emails/trackerAlert');
 const { sendTechDigest } = require('../emails/techDigest');
+const { sendBusinessDigest } = require('../emails/businessDigest');
 
 // POST /api/emails/send/digest — send the weekly digest now
 router.post('/send/digest', async (req, res) => {
@@ -33,6 +34,16 @@ router.post('/send/tech', async (req, res) => {
     res.json({ email: 'tech_digest', ...result });
   } catch (err) {
     res.status(500).json({ email: 'tech_digest', error: err.message });
+  }
+});
+
+// POST /api/emails/send/business — send the cheap-businesses digest now
+router.post('/send/business', async (req, res) => {
+  try {
+    const result = await sendBusinessDigest();
+    res.json({ email: 'business_digest', ...result });
+  } catch (err) {
+    res.status(500).json({ email: 'business_digest', error: err.message });
   }
 });
 
