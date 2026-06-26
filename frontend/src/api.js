@@ -60,5 +60,8 @@ export const api = {
   getDeals: () => request('/api/deals'),
   addDeal: (deal) => request('/api/deals', { method: 'POST', body: JSON.stringify(deal) }),
   updateDeal: (id, updates) => request(`/api/deals/${id}`, { method: 'PATCH', body: JSON.stringify(updates) }),
-  removeDeal: (id) => request(`/api/deals/${id}`, { method: 'DELETE' })
+  removeDeal: (id) => request(`/api/deals/${id}`, { method: 'DELETE' }),
+  getPerformance: () => request('/api/performance'),
+  updatePosition: (ticker, updates) =>
+    request(`/api/performance/${ticker}`, { method: 'PATCH', body: JSON.stringify(updates) })
 };

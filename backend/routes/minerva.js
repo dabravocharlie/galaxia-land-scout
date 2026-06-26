@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db/pool');
 const { listDeals, addDeal, moveDeal, STAGES } = require('./deals');
+const { buildPerformance } = require('./performance');
 
 const MODEL = 'claude-sonnet-4-6';
 
@@ -100,6 +101,20 @@ async function buildSnapshot() {
     deals: deals.slice(0, 30),
   };
 
+  // --- Portfolio performance (live gain/loss) ---
+  try {
+    const perf = await buildPerformance();
+    snapshot.performance = {
+      totals: perf.totals,
+      holdings: perf.holdings.filter(h => h.has_position).map(h => ({
+        ticker: h.ticker, shares: h.shares, avg_cost: h.avg_cost, price: h.price,
+        gain: h.gain, gain_pct: h.gain_pct, dividends: h.dividends_received,
+      })),
+    };
+  } catch {
+    snapshot.performance = { error: 'unavailable' };
+  }
+
   return snapshot;
 }
 
@@ -108,7 +123,7 @@ function systemPrompt(snapshot) {
   - LAND SCOUT: cheap land/property listings across GA/AL/MS (Craigslist) + a Georgia county tax-sale tracker
   - TECH STOCKS: notable technology stocks surfaced weekly
   - BUSINESSES: cheap businesses for sale in Georgia (under $50k, from BizBuySell)
-  - PORTFOLIO: the owner's own stock watchlist/holdings with the latest news on each
+  - PORTFOLIO: the owner's own stock watchlist/holdings with the latest news on each, plus live PERFORMANCE (cost basis, current value, gain/loss, dividends) for holdings where he's entered share counts
   - DEAL PIPELINE: a board of opportunities he's actively working, each at a stage (interested, researching, contacted, offer, closed, passed)
 
 You can manage the deal pipeline for him. When he asks you to add a deal, track something, move a deal to a different stage, or mark something closed or passed, use the add_deal or move_deal tools. After doing so, confirm briefly what you did. When he refers to an item from the modules (like "the cheapest business" or "that Macon parcel"), use the title and details from the snapshot data to create the deal.

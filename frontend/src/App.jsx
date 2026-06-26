@@ -10,11 +10,13 @@ import BusinessList from './components/BusinessList';
 import Minerva from './components/Minerva';
 import Portfolio from './components/Portfolio';
 import Pipeline from './components/Pipeline';
+import Performance from './components/Performance';
 
 const TABS = [
   { id: 'minerva', label: 'Minerva' },
   { id: 'pipeline', label: 'Pipeline' },
   { id: 'portfolio', label: 'Portfolio' },
+  { id: 'performance', label: 'Performance' },
   { id: 'land', label: 'Land Scout' },
   { id: 'tech', label: 'Tech Stocks' },
   { id: 'biz', label: 'Businesses' },
@@ -121,7 +123,7 @@ export default function App() {
                   ALL SYSTEMS ONLINE
                 </div>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--parchment-dim)', marginTop: 4 }}>
-                  6 MODULES ACTIVE
+                  7 MODULES ACTIVE
                 </div>
               </div>
             </div>
@@ -169,6 +171,7 @@ export default function App() {
         {tab === 'minerva' && <Minerva />}
         {tab === 'pipeline' && <Pipeline />}
         {tab === 'portfolio' && <Portfolio />}
+        {tab === 'performance' && <Performance />}
         {tab === 'land' && <LandModule />}
         {tab === 'tech' && <TechStocks />}
         {tab === 'biz' && <BusinessList />}

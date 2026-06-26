@@ -175,9 +175,19 @@ CREATE TABLE IF NOT EXISTS watchlist (
   id SERIAL PRIMARY KEY,
   ticker TEXT NOT NULL,
   note TEXT,                          -- optional user label, e.g. "monthly dividend"
+  shares NUMERIC,                     -- shares held
+  avg_cost NUMERIC,                   -- average cost per share
+  dividends_received NUMERIC DEFAULT 0, -- total dividends received to date (manual)
+  purchase_date DATE,                 -- when the position was opened
   added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(ticker)
 );
+
+-- For databases created before the position columns existed, add them idempotently.
+ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS shares NUMERIC;
+ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS avg_cost NUMERIC;
+ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS dividends_received NUMERIC DEFAULT 0;
+ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS purchase_date DATE;
 
 -- Latest AI news summary per ticker (one current row per ticker, refreshed
 -- each run). Keeps a short summary + when it was last updated.
