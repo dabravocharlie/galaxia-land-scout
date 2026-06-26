@@ -8,10 +8,10 @@ import { api } from '../api';
 
 const SUGGESTIONS = [
   "What's worth looking at this week?",
-  "Show me the cheapest land right now",
+  "Run due diligence on the cheapest business",
   "Any county tax-sale alerts?",
-  "What cheap businesses came in?",
-  "Which tech stocks should I watch?",
+  "Any news on my portfolio?",
+  "Deep dive on the cheapest land parcel",
 ];
 
 export default function Minerva() {
@@ -25,6 +25,7 @@ export default function Minerva() {
   const [voiceSupported, setVoiceSupported] = useState(true);
   const [voices, setVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState('');
+  const [thinkingMsg, setThinkingMsg] = useState('');
 
   const recognitionRef = useRef(null);
   const scrollRef = useRef(null);
@@ -100,10 +101,15 @@ export default function Minerva() {
     const question = (text || '').trim();
     if (!question || loading) return;
 
+    const isDiligence = /\b(analy[sz]e|due diligence|deep dive|deep-dive|vet|research|investigate|dig into|look into)/i.test(question);
+
     const history = messages.filter(m => m.role === 'user' || m.role === 'assistant');
     setMessages(prev => [...prev, { role: 'user', content: question }]);
     setInput('');
     setLoading(true);
+    setThinkingMsg(isDiligence
+      ? 'Running due diligence — this can take up to a minute...'
+      : 'Minerva is reviewing the ledger...');
 
     try {
       const { answer } = await api.askMinerva(question, history);
@@ -168,7 +174,7 @@ export default function Minerva() {
         ))}
         {loading && (
           <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: 'var(--parchment-dim)', fontSize: 14 }}>
-            Minerva is reviewing the ledger...
+            {thinkingMsg || 'Minerva is reviewing the ledger...'}
           </div>
         )}
       </div>

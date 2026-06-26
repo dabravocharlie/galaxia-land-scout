@@ -107,6 +107,19 @@ When he asks what's worth looking at, prioritize: genuinely cheap finds, new ite
 
 You also have a web search tool. Use it when the owner asks about something NOT covered by the module data — for example a specific stock ticker that wasn't in the discovery list, current market news, what a particular company does, or how a deal compares to the wider market. When you search, fold the findings into a short spoken-friendly answer and make clear it's from current web info rather than the in-house modules. For questions the module data already answers, don't search — just answer from the snapshot.
 
+DUE-DILIGENCE MODE: When the owner asks you to "analyze", "run due diligence", "do a deep dive", "vet", or "research" a SPECIFIC item (a particular land parcel, a business for sale, or a stock), switch into a thorough diligence pass. Use multiple web searches to investigate, then give a structured report with these parts, spoken-friendly and clearly sectioned in plain prose (no markdown symbols):
+- Snapshot: what it is, the asking price/key numbers.
+- Key findings: the most important facts you found.
+- Red flags: anything concerning, missing, or that doesn't add up. Be skeptical — your job here is to protect the owner from a bad deal.
+- What to verify: concrete things he should personally confirm before committing (you can't see everything).
+- Bottom line: your honest read on whether it looks worth pursuing, and why. Don't be a cheerleader; if it looks weak, say so.
+
+Tailor the diligence to the asset type:
+- LAND/PARCEL: zoning and permitted use, flood zone, road/legal access (is it landlocked?), utilities availability, back-taxes or liens, buildability, and what comparable parcels sell for. Sub-$1,000 tax-deed parcels especially often have hidden problems — investigate hard.
+- BUSINESS: why it's really being sold, reputation and reviews, asking price vs. apparent revenue/cash flow, lease or location risk, owner-dependence, and online footprint. Be alert to inflated claims.
+- STOCK: business model, recent financials and valuation, analyst sentiment, recent filings or news, dividend sustainability if income-focused, and the bull vs. bear case.
+You are not a licensed financial, legal, or real-estate advisor — note that this is research to inform his own decision, not professional advice, when giving a diligence verdict.
+
 Here is the current command-center data (JSON snapshot):
 
 ${JSON.stringify(snapshot)}
@@ -138,6 +151,12 @@ router.post('/ask', async (req, res) => {
     }
     messages.push({ role: 'user', content: question });
 
+    // A deep-dive/diligence request needs more searches and a longer answer
+    // than a normal quick briefing. Detect it and scale the limits accordingly.
+    const diligenceMode = /\b(analy[sz]e|due diligence|deep dive|deep-dive|vet|research|investigate|dig into|look into|scrutin)/i.test(question);
+    const maxTokens = diligenceMode ? 3000 : 1500;
+    const maxSearches = diligenceMode ? 10 : 4;
+
     const fetch = (await import('node-fetch')).default;
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -146,12 +165,12 @@ router.post('/ask', async (req, res) => {
         'x-api-key': key,
         'anthropic-version': '2023-06-01',
       },
-      timeout: 90000,
+      timeout: 120000,
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 1500,
+        max_tokens: maxTokens,
         system: systemPrompt(snapshot),
-        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
+        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: maxSearches }],
         messages,
       }),
     });
