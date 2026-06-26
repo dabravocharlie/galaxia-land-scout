@@ -56,5 +56,9 @@ export const api = {
   addTicker: (ticker, note) =>
     request('/api/portfolio', { method: 'POST', body: JSON.stringify({ ticker, note }) }),
   removeTicker: (ticker) =>
-    request(`/api/portfolio/${ticker}`, { method: 'DELETE' })
+    request(`/api/portfolio/${ticker}`, { method: 'DELETE' }),
+  getDeals: () => request('/api/deals'),
+  addDeal: (deal) => request('/api/deals', { method: 'POST', body: JSON.stringify(deal) }),
+  updateDeal: (id, updates) => request(`/api/deals/${id}`, { method: 'PATCH', body: JSON.stringify(updates) }),
+  removeDeal: (id) => request(`/api/deals/${id}`, { method: 'DELETE' })
 };

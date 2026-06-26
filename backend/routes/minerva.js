@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db/pool');
+const { listDeals, addDeal, moveDeal, STAGES } = require('./deals');
 
 const MODEL = 'claude-sonnet-4-6';
 
@@ -91,6 +92,14 @@ async function buildSnapshot() {
   `);
   snapshot.portfolio = { holdings: portfolio.rows };
 
+  // --- Deal pipeline ---
+  const deals = await listDeals();
+  snapshot.pipeline = {
+    total: deals.length,
+    by_stage: deals.reduce((acc, d) => { acc[d.stage] = (acc[d.stage] || 0) + 1; return acc; }, {}),
+    deals: deals.slice(0, 30),
+  };
+
   return snapshot;
 }
 
@@ -100,6 +109,9 @@ function systemPrompt(snapshot) {
   - TECH STOCKS: notable technology stocks surfaced weekly
   - BUSINESSES: cheap businesses for sale in Georgia (under $50k, from BizBuySell)
   - PORTFOLIO: the owner's own stock watchlist/holdings with the latest news on each
+  - DEAL PIPELINE: a board of opportunities he's actively working, each at a stage (interested, researching, contacted, offer, closed, passed)
+
+You can manage the deal pipeline for him. When he asks you to add a deal, track something, move a deal to a different stage, or mark something closed or passed, use the add_deal or move_deal tools. After doing so, confirm briefly what you did. When he refers to an item from the modules (like "the cheapest business" or "that Macon parcel"), use the title and details from the snapshot data to create the deal.
 
 You speak to the owner (Bravo Charlie) directly, like a sharp, trusted analyst giving a briefing. Be concise and conversational — this may be read aloud by a voice system, so avoid tables, markdown headers, bullet symbols, and long URLs. Use natural spoken phrasing and short paragraphs. Lead with what's most worth his attention.
 
@@ -157,30 +169,101 @@ router.post('/ask', async (req, res) => {
     const maxTokens = diligenceMode ? 3000 : 1500;
     const maxSearches = diligenceMode ? 10 : 4;
 
-    const fetch = (await import('node-fetch')).default;
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
+    // Tools Minerva can use: web search (server-side) + pipeline management
+    // (custom tools we execute here).
+    const tools = [
+      { type: 'web_search_20250305', name: 'web_search', max_uses: maxSearches },
+      {
+        name: 'add_deal',
+        description: 'Add a new opportunity to the deal pipeline board.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Short name for the deal' },
+            deal_type: { type: 'string', enum: ['land', 'business', 'stock', 'other'] },
+            amount: { type: 'number', description: 'Asking price or deal size if known' },
+            link: { type: 'string', description: 'Source URL if available' },
+            stage: { type: 'string', enum: STAGES, description: 'Starting stage (default interested)' },
+            notes: { type: 'string' },
+          },
+          required: ['title'],
+        },
       },
-      timeout: 120000,
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: maxTokens,
-        system: systemPrompt(snapshot),
-        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: maxSearches }],
-        messages,
-      }),
-    });
+      {
+        name: 'move_deal',
+        description: 'Move an existing deal to a different pipeline stage. Identify the deal by title (fuzzy match) or id.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Title (or part of it) of the deal to move' },
+            id: { type: 'number', description: 'Deal id, if known' },
+            stage: { type: 'string', enum: STAGES, description: 'New stage' },
+          },
+          required: ['stage'],
+        },
+      },
+    ];
 
-    if (!resp.ok) {
-      const body = await resp.text().catch(() => '');
-      return res.status(502).json({ error: `Anthropic HTTP ${resp.status}: ${body.slice(0, 200)}` });
+    const fetch = (await import('node-fetch')).default;
+
+    async function callApi(msgs) {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+        timeout: 120000,
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: maxTokens,
+          system: systemPrompt(snapshot),
+          tools,
+          messages: msgs,
+        }),
+      });
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => '');
+        throw new Error(`Anthropic HTTP ${resp.status}: ${body.slice(0, 200)}`);
+      }
+      return resp.json();
     }
 
-    const data = await resp.json();
+    // Execute one of our custom pipeline tools, returning a result string.
+    async function runTool(name, input) {
+      try {
+        if (name === 'add_deal') {
+          const d = await addDeal(input);
+          return `Added "${d.title}" to the pipeline at stage "${d.stage}".`;
+        }
+        if (name === 'move_deal') {
+          const d = await moveDeal(input);
+          return `Moved "${d.title}" to stage "${d.stage}".`;
+        }
+        return `Unknown tool: ${name}`;
+      } catch (e) {
+        return `Tool error: ${e.message}`;
+      }
+    }
+
+    // Tool-use loop: keep calling until Claude stops requesting our tools.
+    // (web_search is server-side and resolves within a single response.)
+    let data = await callApi(messages);
+    let guard = 0;
+    while (data.stop_reason === 'tool_use' && guard < 5) {
+      guard++;
+      const toolUses = (data.content || []).filter(b => b.type === 'tool_use');
+      const customUses = toolUses.filter(b => b.name === 'add_deal' || b.name === 'move_deal');
+      // If the only tool calls are server-side (web_search), nothing for us to do.
+      if (customUses.length === 0) break;
+
+      messages.push({ role: 'assistant', content: data.content });
+      const toolResults = [];
+      for (const tu of customUses) {
+        const out = await runTool(tu.name, tu.input || {});
+        toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: out });
+      }
+      messages.push({ role: 'user', content: toolResults });
+      data = await callApi(messages);
+    }
+
     let answer = '';
     for (const block of data.content || []) {
       if (block.type === 'text') answer += block.text;

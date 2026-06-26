@@ -12,6 +12,7 @@ const techStocksRouter = require('./routes/techstocks');
 const businessesRouter = require('./routes/businesses');
 const minervaRouter = require('./routes/minerva');
 const portfolioRouter = require('./routes/portfolio');
+const dealsRouter = require('./routes/deals');
 const { startScheduler } = require('./jobs/scheduler');
 
 const app = express();
@@ -37,6 +38,7 @@ app.use('/api/techstocks', techStocksRouter);
 app.use('/api/businesses', businessesRouter);
 app.use('/api/minerva', minervaRouter);
 app.use('/api/portfolio', portfolioRouter);
+app.use('/api/deals', dealsRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

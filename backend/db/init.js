@@ -203,6 +203,25 @@ INSERT INTO watchlist (ticker, note) VALUES
   ('SPMO', 'momentum ETF'),
   ('TOPT', 'ETF')
 ON CONFLICT (ticker) DO NOTHING;
+
+-- Deal pipeline: a unified board of opportunities the owner is actively
+-- working, regardless of type (land / business / stock / other). Deals are
+-- added manually, by Minerva, or (later) promoted from module listings.
+CREATE TABLE IF NOT EXISTS deals (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  deal_type TEXT,                    -- 'land' | 'business' | 'stock' | 'other'
+  stage TEXT NOT NULL DEFAULT 'interested',  -- interested|researching|contacted|offer|closed|passed
+  amount NUMERIC,                    -- asking price / deal size if known
+  link TEXT,                         -- source URL if any
+  notes TEXT,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_deals_stage ON deals(stage);
+CREATE INDEX IF NOT EXISTS idx_deals_type ON deals(deal_type);
 `;
 
 async function init() {
