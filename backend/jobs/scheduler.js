@@ -53,12 +53,11 @@ function startScheduler() {
     console.log('[scheduler] Running weekly Craigslist check...');
     try {
       await scrapeCraigslist();
-      // Retail scrapers (LandSearch/LandWatch) DISABLED — both sites require
-      // ScraperAPI's paid premium proxy pools to get past their anti-bot
-      // blocks, which the free tier doesn't include. Code is left intact;
-      // re-enable these two lines (and ensure a paid SCRAPERAPI_KEY) to resume.
-      // await scrapeLandSearch();
-      // await scrapeLandWatch();
+      // Retail scrapers (LandSearch/LandWatch) — re-enabled now that ScraperAPI
+      // is on a paid plan with ultra_premium pool access (both sites hard-block
+      // datacenter IPs otherwise). Each routes through ScraperAPI in retail.js.
+      await scrapeLandSearch();
+      await scrapeLandWatch();
       await sendWeeklyDigest();
     } catch (err) {
       console.error('[scheduler] Weekly check failed:', err.message);
