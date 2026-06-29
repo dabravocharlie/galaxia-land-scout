@@ -9,6 +9,28 @@ const { pool } = require('../db/pool');
 const { listDeals, addDeal, moveDeal, STAGES } = require('./deals');
 const { buildPerformance } = require('./performance');
 
+// --- watchlist helpers (Minerva manages which tickers are tracked) ---
+async function addToWatchlist(ticker, note) {
+  const t = (ticker || '').toUpperCase().trim();
+  if (!t || t.length > 10 || !/^[A-Z.\-]+$/.test(t)) throw new Error('Invalid ticker');
+  const r = await pool.query(
+    `INSERT INTO watchlist (ticker, note) VALUES ($1, $2)
+     ON CONFLICT (ticker) DO UPDATE SET note = COALESCE(EXCLUDED.note, watchlist.note)
+     RETURNING ticker`,
+    [t, note || null]
+  );
+  return r.rows[0].ticker;
+}
+
+async function removeFromWatchlist(ticker) {
+  const t = (ticker || '').toUpperCase().trim();
+  if (!t) throw new Error('No ticker given');
+  const r = await pool.query('DELETE FROM watchlist WHERE ticker = $1 RETURNING ticker', [t]);
+  await pool.query('DELETE FROM watchlist_news WHERE ticker = $1', [t]);
+  if (r.rows.length === 0) throw new Error(`${t} wasn't in the watchlist`);
+  return t;
+}
+
 const MODEL = 'claude-sonnet-4-6';
 
 // Build a compact, actionable snapshot of the whole command center. We pull
@@ -128,6 +150,8 @@ function systemPrompt(snapshot) {
 
 You can manage the deal pipeline for him. When he asks you to add a deal, track something, move a deal to a different stage, or mark something closed or passed, use the add_deal or move_deal tools. After doing so, confirm briefly what you did. When he refers to an item from the modules (like "the cheapest business" or "that Macon parcel"), use the title and details from the snapshot data to create the deal.
 
+You can also manage his portfolio watchlist. When he asks to add a stock/ticker to his portfolio or watchlist, use add_to_watchlist; when he asks to remove or drop one, use remove_from_watchlist. Always read back the exact ticker you're adding or removing so any mishearing is obvious (e.g. "Adding N-V-D-A, NVIDIA, to your watchlist — done"). He enters share counts and cost basis himself in the Performance tab, so after adding a ticker, remind him of that briefly.
+
 You speak to the owner (Bravo Charlie) directly, like a sharp, trusted analyst giving a briefing. Be concise and conversational — this may be read aloud by a voice system, so avoid tables, markdown headers, bullet symbols, and long URLs. Use natural spoken phrasing and short paragraphs. Lead with what's most worth his attention.
 
 When he asks what's worth looking at, prioritize: genuinely cheap finds, new items since last week, pending county tax-sale alerts, and tech names with strong catalysts. Give specific numbers and names. If something looks like a standout deal, say so and say why. If a module is quiet, say so briefly. Don't invent listings — only reference what's in the data provided.
@@ -217,6 +241,29 @@ router.post('/ask', async (req, res) => {
           required: ['stage'],
         },
       },
+      {
+        name: 'add_to_watchlist',
+        description: "Add a stock ticker to the owner's portfolio watchlist so it's tracked for news and performance. He'll enter share counts and cost himself in the Performance tab.",
+        input_schema: {
+          type: 'object',
+          properties: {
+            ticker: { type: 'string', description: 'Stock ticker symbol, e.g. NVDA' },
+            note: { type: 'string', description: 'Optional label, e.g. "monthly dividend"' },
+          },
+          required: ['ticker'],
+        },
+      },
+      {
+        name: 'remove_from_watchlist',
+        description: "Remove a stock ticker from the owner's portfolio watchlist (also clears its news and position).",
+        input_schema: {
+          type: 'object',
+          properties: {
+            ticker: { type: 'string', description: 'Stock ticker symbol to remove' },
+          },
+          required: ['ticker'],
+        },
+      },
     ];
 
     const fetch = (await import('node-fetch')).default;
@@ -252,6 +299,14 @@ router.post('/ask', async (req, res) => {
           const d = await moveDeal(input);
           return `Moved "${d.title}" to stage "${d.stage}".`;
         }
+        if (name === 'add_to_watchlist') {
+          const t = await addToWatchlist(input.ticker, input.note);
+          return `Added ${t} to the portfolio watchlist. News will populate on the next run; enter shares and cost in the Performance tab to track gain/loss.`;
+        }
+        if (name === 'remove_from_watchlist') {
+          const t = await removeFromWatchlist(input.ticker);
+          return `Removed ${t} from the portfolio watchlist.`;
+        }
         return `Unknown tool: ${name}`;
       } catch (e) {
         return `Tool error: ${e.message}`;
@@ -265,7 +320,9 @@ router.post('/ask', async (req, res) => {
     while (data.stop_reason === 'tool_use' && guard < 5) {
       guard++;
       const toolUses = (data.content || []).filter(b => b.type === 'tool_use');
-      const customUses = toolUses.filter(b => b.name === 'add_deal' || b.name === 'move_deal');
+      const customUses = toolUses.filter(b =>
+        b.name === 'add_deal' || b.name === 'move_deal' ||
+        b.name === 'add_to_watchlist' || b.name === 'remove_from_watchlist');
       // If the only tool calls are server-side (web_search), nothing for us to do.
       if (customUses.length === 0) break;
 
