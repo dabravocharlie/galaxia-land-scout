@@ -232,6 +232,38 @@ CREATE TABLE IF NOT EXISTS deals (
 
 CREATE INDEX IF NOT EXISTS idx_deals_stage ON deals(stage);
 CREATE INDEX IF NOT EXISTS idx_deals_type ON deals(deal_type);
+
+-- Minerva conversation memory: persists chat so she remembers across sessions.
+CREATE TABLE IF NOT EXISTS conversations (
+  id SERIAL PRIMARY KEY,
+  role TEXT NOT NULL,                 -- 'user' | 'assistant'
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_conversations_created ON conversations(created_at);
+
+-- Calendar / deadlines: tax-sale dates, auction closes, earnings, reminders.
+CREATE TABLE IF NOT EXISTS events (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  event_date DATE NOT NULL,
+  event_type TEXT,                    -- 'tax_sale' | 'auction' | 'earnings' | 'reminder' | 'other'
+  notes TEXT,
+  done BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
+
+-- Notes / documents: stored drafts (email inquiries, LOIs, offers) and research.
+CREATE TABLE IF NOT EXISTS notes (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  body TEXT,
+  category TEXT,                      -- 'email' | 'loi' | 'offer' | 'research' | 'note'
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_notes_updated ON notes(updated_at);
 `;
 
 async function init() {

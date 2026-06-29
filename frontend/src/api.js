@@ -63,5 +63,13 @@ export const api = {
   removeDeal: (id) => request(`/api/deals/${id}`, { method: 'DELETE' }),
   getPerformance: () => request('/api/performance'),
   updatePosition: (ticker, updates) =>
-    request(`/api/performance/${ticker}`, { method: 'PATCH', body: JSON.stringify(updates) })
+    request(`/api/performance/${ticker}`, { method: 'PATCH', body: JSON.stringify(updates) }),
+  getEvents: (upcoming) => request(`/api/events${upcoming ? '?upcoming=1' : ''}`),
+  addEvent: (e) => request('/api/events', { method: 'POST', body: JSON.stringify(e) }),
+  updateEvent: (id, u) => request(`/api/events/${id}`, { method: 'PATCH', body: JSON.stringify(u) }),
+  removeEvent: (id) => request(`/api/events/${id}`, { method: 'DELETE' }),
+  getNotes: () => request('/api/notes'),
+  addNote: (n) => request('/api/notes', { method: 'POST', body: JSON.stringify(n) }),
+  updateNote: (id, u) => request(`/api/notes/${id}`, { method: 'PATCH', body: JSON.stringify(u) }),
+  removeNote: (id) => request(`/api/notes/${id}`, { method: 'DELETE' })
 };

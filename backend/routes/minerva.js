@@ -8,6 +8,8 @@ const router = express.Router();
 const { pool } = require('../db/pool');
 const { listDeals, addDeal, moveDeal, STAGES } = require('./deals');
 const { buildPerformance } = require('./performance');
+const { listEvents, addEvent } = require('./events');
+const { listNotes, addNote } = require('./notes');
 
 // --- watchlist helpers (Minerva manages which tickers are tracked) ---
 async function addToWatchlist(ticker, note) {
@@ -39,27 +41,32 @@ const MODEL = 'claude-sonnet-4-6';
 async function buildSnapshot() {
   const snapshot = {};
 
-  // --- Land ---
+  // --- Land --- (3-month window, weighted to cheap + recent)
   const landStats = await pool.query(`
     SELECT
       COUNT(*) AS total,
       COUNT(*) FILTER (WHERE status = 'new') AS new_count,
       COUNT(*) FILTER (WHERE price < 1000) AS under_1k,
-      COUNT(*) FILTER (WHERE date_found >= NOW() - INTERVAL '7 days') AS new_this_week
+      COUNT(*) FILTER (WHERE date_found >= NOW() - INTERVAL '7 days') AS new_this_week,
+      COUNT(*) FILTER (WHERE date_found >= NOW() - INTERVAL '90 days') AS last_90_days
     FROM listings
   `);
+  // All genuinely cheap finds over the last 3 months (the treasures)
   const landCheapest = await pool.query(`
     SELECT title, state, county, price, acreage, source, source_url, date_found
     FROM listings
     WHERE price IS NOT NULL AND price > 0
+      AND date_found >= NOW() - INTERVAL '90 days'
     ORDER BY price ASC
-    LIMIT 15
+    LIMIT 60
   `);
+  // A generous sample of recent listings across all prices
   const landRecent = await pool.query(`
     SELECT title, state, county, price, source, date_found
     FROM listings
+    WHERE date_found >= NOW() - INTERVAL '90 days'
     ORDER BY date_found DESC
-    LIMIT 10
+    LIMIT 40
   `);
   snapshot.land = { stats: landStats.rows[0], cheapest: landCheapest.rows, recent: landRecent.rows };
 
@@ -75,34 +82,38 @@ async function buildSnapshot() {
     rows: counties.rows.slice(0, 20),
   };
 
-  // --- Tech stocks ---
+  // --- Tech stocks --- (3-month window)
   const techStats = await pool.query(`
     SELECT COUNT(*) AS total,
            COUNT(*) FILTER (WHERE status = 'new') AS new_count,
-           COUNT(*) FILTER (WHERE status = 'watching') AS watching_count
+           COUNT(*) FILTER (WHERE status = 'watching') AS watching_count,
+           COUNT(*) FILTER (WHERE last_seen_at >= NOW() - INTERVAL '90 days') AS last_90_days
     FROM tech_stocks
   `);
   const techRecent = await pool.query(`
     SELECT ticker, company, category, reason, status, last_seen_at
     FROM tech_stocks
+    WHERE last_seen_at >= NOW() - INTERVAL '90 days'
     ORDER BY last_seen_at DESC
-    LIMIT 20
+    LIMIT 60
   `);
   snapshot.tech = { stats: techStats.rows[0], recent: techRecent.rows };
 
-  // --- Businesses ---
+  // --- Businesses --- (3-month window, weighted to cheap)
   const bizStats = await pool.query(`
     SELECT COUNT(*) AS total,
            COUNT(*) FILTER (WHERE status = 'new') AS new_count,
-           COUNT(*) FILTER (WHERE price < 25000) AS under_25k
+           COUNT(*) FILTER (WHERE price < 25000) AS under_25k,
+           COUNT(*) FILTER (WHERE date_found >= NOW() - INTERVAL '90 days') AS last_90_days
     FROM businesses
   `);
   const bizCheapest = await pool.query(`
     SELECT title, location, price, cash_flow, source_url, date_found
     FROM businesses
     WHERE price IS NOT NULL AND price > 0
+      AND date_found >= NOW() - INTERVAL '90 days'
     ORDER BY price ASC
-    LIMIT 15
+    LIMIT 50
   `);
   snapshot.businesses = { stats: bizStats.rows[0], cheapest: bizCheapest.rows };
 
@@ -137,6 +148,24 @@ async function buildSnapshot() {
     snapshot.performance = { error: 'unavailable' };
   }
 
+  // --- Calendar (upcoming deadlines) ---
+  try {
+    const events = await listEvents({ upcomingOnly: true });
+    snapshot.calendar = { upcoming: events.slice(0, 30) };
+  } catch {
+    snapshot.calendar = { upcoming: [] };
+  }
+
+  // --- Notes / drafts (titles + categories, not full bodies, to stay light) ---
+  try {
+    const notes = await listNotes();
+    snapshot.notes = notes.slice(0, 30).map(n => ({
+      id: n.id, title: n.title, category: n.category, updated_at: n.updated_at,
+    }));
+  } catch {
+    snapshot.notes = [];
+  }
+
   return snapshot;
 }
 
@@ -147,6 +176,12 @@ function systemPrompt(snapshot) {
   - BUSINESSES: cheap businesses for sale in Georgia (under $50k, from BizBuySell)
   - PORTFOLIO: the owner's own stock watchlist/holdings with the latest news on each, plus live PERFORMANCE (cost basis, current value, gain/loss, dividends) for holdings where he's entered share counts
   - DEAL PIPELINE: a board of opportunities he's actively working, each at a stage (interested, researching, contacted, offer, closed, passed)
+  - CALENDAR: upcoming deadlines and reminders (tax-sale dates, auction closes, earnings, his own reminders)
+  - NOTES: saved drafts and research — including email inquiries, letters of intent (LOIs), and non-binding offers
+
+You can add calendar events/deadlines with the add_event tool when he asks you to remember a date or set a reminder ("remind me the Fulton tax sale is March 4"). Read back the date you're recording.
+
+You can save notes and drafts with the save_note tool. When he asks you to DRAFT an email inquiry, a letter of intent (LOI), or a non-binding offer for a deal, write the full draft and save it via save_note (category 'email', 'loi', or 'offer'), then tell him it's saved to his Notes tab to review and send himself. IMPORTANT LIMITS on drafting: you may draft email inquiries, LOIs, and NON-BINDING offers only. You must NOT draft binding contracts, purchase-and-sale agreements, or any document meant to be legally executed — if he asks for one, explain that a binding contract should be prepared or reviewed by a Georgia real-estate attorney, and offer to draft a non-binding LOI or offer instead. You are not a lawyer; even the LOIs/offers you draft are starting points he should have reviewed before sending anything significant.
 
 You can manage the deal pipeline for him. When he asks you to add a deal, track something, move a deal to a different stage, or mark something closed or passed, use the add_deal or move_deal tools. After doing so, confirm briefly what you did. When he refers to an item from the modules (like "the cheapest business" or "that Macon parcel"), use the title and details from the snapshot data to create the deal.
 
@@ -171,7 +206,7 @@ Tailor the diligence to the asset type:
 - STOCK: business model, recent financials and valuation, analyst sentiment, recent filings or news, dividend sustainability if income-focused, and the bull vs. bear case.
 You are not a licensed financial, legal, or real-estate advisor — note that this is research to inform his own decision, not professional advice, when giving a diligence verdict.
 
-Here is the current command-center data (JSON snapshot):
+Here is the current command-center data (JSON snapshot). It now covers roughly the LAST 3 MONTHS: your portfolio, deals, and performance in full, plus the cheapest and most recent land/business/tech finds over that window with summary stats showing totals. When he asks about trends or "what have we seen lately," you can speak to the 3-month picture, but note you're seeing the standout and recent items plus totals, not literally every single listing.
 
 ${JSON.stringify(snapshot)}
 
@@ -191,13 +226,27 @@ router.post('/ask', async (req, res) => {
 
     const snapshot = await buildSnapshot();
 
-    // Build messages: prior turns (text only) + the new question
+    // Cross-session memory: pull the recent conversation from the database so
+    // Minerva remembers prior chats even after the browser is closed. We load
+    // the last ~16 turns (8 exchanges) in chronological order.
+    let priorTurns = [];
+    try {
+      const hist = await pool.query(
+        `SELECT role, content FROM (
+           SELECT id, role, content FROM conversations ORDER BY id DESC LIMIT 16
+         ) sub ORDER BY id ASC`
+      );
+      priorTurns = hist.rows;
+    } catch {
+      priorTurns = [];
+    }
+
+    // Build messages: DB history + the new question. (We prefer DB history for
+    // durable memory; the frontend no longer needs to send its own.)
     const messages = [];
-    if (Array.isArray(history)) {
-      for (const h of history.slice(-8)) {
-        if (h && (h.role === 'user' || h.role === 'assistant') && typeof h.content === 'string') {
-          messages.push({ role: h.role, content: h.content });
-        }
+    for (const h of priorTurns) {
+      if ((h.role === 'user' || h.role === 'assistant') && typeof h.content === 'string') {
+        messages.push({ role: h.role, content: h.content });
       }
     }
     messages.push({ role: 'user', content: question });
@@ -264,6 +313,33 @@ router.post('/ask', async (req, res) => {
           required: ['ticker'],
         },
       },
+      {
+        name: 'add_event',
+        description: "Add a deadline or reminder to the owner's calendar (tax-sale date, auction close, earnings, or a personal reminder).",
+        input_schema: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'What the event/deadline is' },
+            event_date: { type: 'string', description: 'Date in YYYY-MM-DD format' },
+            event_type: { type: 'string', enum: ['tax_sale', 'auction', 'earnings', 'reminder', 'other'] },
+            notes: { type: 'string' },
+          },
+          required: ['title', 'event_date'],
+        },
+      },
+      {
+        name: 'save_note',
+        description: "Save a note or draft to the owner's Notes tab. Use for drafting email inquiries, letters of intent (LOIs), and NON-BINDING offers, or saving research. Never use for binding contracts.",
+        input_schema: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Short title for the note/draft' },
+            body: { type: 'string', description: 'The full text of the note or draft' },
+            category: { type: 'string', enum: ['email', 'loi', 'offer', 'research', 'note'] },
+          },
+          required: ['title', 'body'],
+        },
+      },
     ];
 
     const fetch = (await import('node-fetch')).default;
@@ -307,6 +383,14 @@ router.post('/ask', async (req, res) => {
           const t = await removeFromWatchlist(input.ticker);
           return `Removed ${t} from the portfolio watchlist.`;
         }
+        if (name === 'add_event') {
+          const e = await addEvent(input);
+          return `Added "${e.title}" to the calendar for ${e.event_date}.`;
+        }
+        if (name === 'save_note') {
+          const n = await addNote(input);
+          return `Saved "${n.title}" (${n.category}) to the Notes tab.`;
+        }
         return `Unknown tool: ${name}`;
       } catch (e) {
         return `Tool error: ${e.message}`;
@@ -322,7 +406,8 @@ router.post('/ask', async (req, res) => {
       const toolUses = (data.content || []).filter(b => b.type === 'tool_use');
       const customUses = toolUses.filter(b =>
         b.name === 'add_deal' || b.name === 'move_deal' ||
-        b.name === 'add_to_watchlist' || b.name === 'remove_from_watchlist');
+        b.name === 'add_to_watchlist' || b.name === 'remove_from_watchlist' ||
+        b.name === 'add_event' || b.name === 'save_note');
       // If the only tool calls are server-side (web_search), nothing for us to do.
       if (customUses.length === 0) break;
 
@@ -341,6 +426,22 @@ router.post('/ask', async (req, res) => {
       if (block.type === 'text') answer += block.text;
     }
     answer = answer.trim() || "I couldn't pull that together just now — try asking again.";
+
+    // Persist this turn for cross-session memory.
+    try {
+      await pool.query(
+        `INSERT INTO conversations (role, content) VALUES ('user', $1), ('assistant', $2)`,
+        [question, answer]
+      );
+      // Keep the table from growing unbounded — retain the most recent 200 turns.
+      await pool.query(
+        `DELETE FROM conversations WHERE id < (
+           SELECT MIN(id) FROM (SELECT id FROM conversations ORDER BY id DESC LIMIT 200) t
+         )`
+      );
+    } catch (e) {
+      console.error('[minerva] failed to persist conversation:', e.message);
+    }
 
     res.json({ answer });
   } catch (err) {
