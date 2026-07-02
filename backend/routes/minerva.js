@@ -11,6 +11,24 @@ const { buildPerformance } = require('./performance');
 const { listEvents, addEvent } = require('./events');
 const { listNotes, addNote } = require('./notes');
 
+// Job runners for on-demand triggering by Minerva. Mirrors routes/jobs.js.
+const { scrapeCraigslist } = require('../jobs/craigslist');
+const { scrapeLandWatch, scrapeLandSearch } = require('../jobs/retail');
+const { trackTaxSales } = require('../jobs/taxSaleTracker');
+const { discoverTechStocks } = require('../jobs/techDiscovery');
+const { scrapeBusinesses } = require('../jobs/businesses');
+const { refreshPortfolioNews } = require('../jobs/portfolio');
+
+const RUNNABLE_JOBS = {
+  craigslist: scrapeCraigslist,
+  landsearch: scrapeLandSearch,
+  landwatch: scrapeLandWatch,
+  tax_sale_tracker: trackTaxSales,
+  tech_discovery: discoverTechStocks,
+  businesses: scrapeBusinesses,
+  portfolio: refreshPortfolioNews,
+};
+
 // --- watchlist helpers (Minerva manages which tickers are tracked) ---
 async function addToWatchlist(ticker, note) {
   const t = (ticker || '').toUpperCase().trim();
@@ -183,6 +201,8 @@ You can add calendar events/deadlines with the add_event tool when he asks you t
 
 You can save notes and drafts with the save_note tool. When he asks you to DRAFT an email inquiry, a letter of intent (LOI), or a non-binding offer for a deal, write the full draft and save it via save_note (category 'email', 'loi', or 'offer'), then tell him it's saved to his Notes tab to review and send himself. IMPORTANT LIMITS on drafting: you may draft email inquiries, LOIs, and NON-BINDING offers only. You must NOT draft binding contracts, purchase-and-sale agreements, or any document meant to be legally executed — if he asks for one, explain that a binding contract should be prepared or reviewed by a Georgia real-estate attorney, and offer to draft a non-binding LOI or offer instead. You are not a lawyer; even the LOIs/offers you draft are starting points he should have reviewed before sending anything significant.
 
+You can trigger data-collection jobs on demand with the run_job tool when he asks to run, refresh, or update a source now (rather than waiting for the Monday schedule). Available jobs: craigslist, landsearch, landwatch, tax_sale_tracker, tech_discovery, businesses, portfolio. The businesses, landsearch, and landwatch scrapers use PAID ScraperAPI credits — briefly note that when running them, but go ahead and run them as asked. The paid scrapers run in the background and take a few minutes; the others return a count quickly.
+
 You can manage the deal pipeline for him. When he asks you to add a deal, track something, move a deal to a different stage, or mark something closed or passed, use the add_deal or move_deal tools. After doing so, confirm briefly what you did. When he refers to an item from the modules (like "the cheapest business" or "that Macon parcel"), use the title and details from the snapshot data to create the deal.
 
 You can also manage his portfolio watchlist. When he asks to add a stock/ticker to his portfolio or watchlist, use add_to_watchlist; when he asks to remove or drop one, use remove_from_watchlist. Always read back the exact ticker you're adding or removing so any mishearing is obvious (e.g. "Adding N-V-D-A, NVIDIA, to your watchlist — done"). He enters share counts and cost basis himself in the Performance tab, so after adding a ticker, remind him of that briefly.
@@ -340,6 +360,21 @@ router.post('/ask', async (req, res) => {
           required: ['title', 'body'],
         },
       },
+      {
+        name: 'run_job',
+        description: "Trigger a data-collection job on demand when the owner asks to run/refresh a scraper or news pull now. Jobs: craigslist, landsearch, landwatch, tax_sale_tracker (land); tech_discovery (tech stocks); businesses (BizBuySell); portfolio (portfolio news). Note: businesses, landsearch, and landwatch consume paid ScraperAPI credits — mention that briefly when running them, but proceed.",
+        input_schema: {
+          type: 'object',
+          properties: {
+            job: {
+              type: 'string',
+              enum: ['craigslist', 'landsearch', 'landwatch', 'tax_sale_tracker', 'tech_discovery', 'businesses', 'portfolio'],
+              description: 'Which job to run',
+            },
+          },
+          required: ['job'],
+        },
+      },
     ];
 
     const fetch = (await import('node-fetch')).default;
@@ -391,6 +426,26 @@ router.post('/ask', async (req, res) => {
           const n = await addNote(input);
           return `Saved "${n.title}" (${n.category}) to the Notes tab.`;
         }
+        if (name === 'run_job') {
+          const runner = RUNNABLE_JOBS[input.job];
+          if (!runner) return `Unknown job: ${input.job}`;
+          const paid = ['businesses', 'landsearch', 'landwatch'].includes(input.job);
+          // Fast jobs (portfolio/tech/tracker/craigslist) we await for a count.
+          // Slow paid scrapers we kick off in the background so the chat doesn't
+          // hang for minutes — report that it's running.
+          if (paid) {
+            runner().then(r => console.log(`[minerva] ${input.job} done:`, r))
+                    .catch(e => console.error(`[minerva] ${input.job} failed:`, e.message));
+            return `Started the ${input.job} scraper — it runs in the background and takes a few minutes (uses paid ScraperAPI credits). Results will appear in the tab shortly.`;
+          }
+          try {
+            const r = await runner();
+            const found = r && (r.listingsFound ?? r.newListings);
+            return `Ran ${input.job}. ${found !== undefined ? `Found ${r.listingsFound ?? 0}, new ${r.newListings ?? 0}.` : 'Done.'}`;
+          } catch (e) {
+            return `The ${input.job} job errored: ${e.message}`;
+          }
+        }
         return `Unknown tool: ${name}`;
       } catch (e) {
         return `Tool error: ${e.message}`;
@@ -407,7 +462,7 @@ router.post('/ask', async (req, res) => {
       const customUses = toolUses.filter(b =>
         b.name === 'add_deal' || b.name === 'move_deal' ||
         b.name === 'add_to_watchlist' || b.name === 'remove_from_watchlist' ||
-        b.name === 'add_event' || b.name === 'save_note');
+        b.name === 'add_event' || b.name === 'save_note' || b.name === 'run_job');
       // If the only tool calls are server-side (web_search), nothing for us to do.
       if (customUses.length === 0) break;
 
