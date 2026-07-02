@@ -25,8 +25,8 @@ const { sendPortfolioDigest } = require('../emails/portfolioDigest');
 // const { sendWeeklyDigest } = require('../emails/weeklyDigest'); // TODO: build with email layer
 
 function startScheduler() {
-  // Tax sale tracker - Mon/Wed/Fri at 7:00 AM server time
-  cron.schedule('0 7 * * 1,3,5', async () => {
+  // Tax sale tracker - Mondays at 7:00 AM server time
+  cron.schedule('0 7 * * 1', async () => {
     console.log('[scheduler] Running tax sale tracker...');
     try {
       await trackTaxSales();
@@ -37,8 +37,8 @@ function startScheduler() {
     }
   });
 
-  // Portfolio news - Mon/Wed/Fri at 7:30 AM server time (like the old Stock News Bot)
-  cron.schedule('30 7 * * 1,3,5', async () => {
+  // Portfolio news - Mondays at 7:30 AM server time
+  cron.schedule('30 7 * * 1', async () => {
     console.log('[scheduler] Running portfolio news...');
     try {
       await refreshPortfolioNews();
@@ -87,7 +87,7 @@ function startScheduler() {
     }
   });
 
-  console.log('✅ Scheduler started: tracker Mon/Wed/Fri @ 7am, Craigslist+digest Mon @ 7am, tech Mon @ 8am, businesses Mon @ 9am');
+  console.log('✅ Scheduler started (all Mondays): tracker 7am, portfolio 7:30am, Craigslist+retail+digest 7am, tech 8am, businesses 9am');
 }
 
 module.exports = { startScheduler };
