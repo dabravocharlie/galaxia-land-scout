@@ -10,6 +10,7 @@ const { listDeals, addDeal, moveDeal, STAGES } = require('./deals');
 const { buildPerformance } = require('./performance');
 const { listEvents, addEvent } = require('./events');
 const { listNotes, addNote } = require('./notes');
+const { listMarketing, addMarketing, moveMarketing, MKT_STAGES } = require('./marketing');
 
 // Job runners for on-demand triggering by Minerva. Mirrors routes/jobs.js.
 const { scrapeCraigslist } = require('../jobs/craigslist');
@@ -184,6 +185,21 @@ async function buildSnapshot() {
     snapshot.notes = [];
   }
 
+  // --- Marketing workflow ---
+  try {
+    const mkt = await listMarketing();
+    snapshot.marketing = {
+      total: mkt.length,
+      by_stage: mkt.reduce((acc, m) => { acc[m.stage] = (acc[m.stage] || 0) + 1; return acc; }, {}),
+      items: mkt.slice(0, 30).map(m => ({
+        id: m.id, title: m.title, product: m.product, channel: m.channel,
+        stage: m.stage, link: m.link, updated_at: m.updated_at,
+      })),
+    };
+  } catch {
+    snapshot.marketing = { total: 0, items: [] };
+  }
+
   return snapshot;
 }
 
@@ -196,6 +212,9 @@ function systemPrompt(snapshot) {
   - DEAL PIPELINE: a board of opportunities he's actively working, each at a stage (interested, researching, contacted, offer, closed, passed)
   - CALENDAR: upcoming deadlines and reminders (tax-sale dates, auction closes, earnings, his own reminders)
   - NOTES: saved drafts and research — including email inquiries, letters of intent (LOIs), and non-binding offers
+  - MARKETING: a workflow board of ad/content/campaign pieces moving through stages (idea, scripting, production, ready, posted, parked)
+
+You are also the owner's MARKETING PARTNER. He markets products (the first is "Hermie") and creates his video ads in Higgsfield AI, then posts to social media (TikTok, Instagram, YouTube, etc.). Help him think through marketing strategy conversationally: campaign concepts, target audiences, hooks and ad angles, channel choices, posting cadence, and ad copy/scripts. When he lands on ideas worth pursuing, capture them on the marketing board with add_marketing (put concept/copy in 'script'), and move items along with move_marketing as they progress (idea -> scripting -> production once he's building it in Higgsfield -> ready -> posted). He'll paste Higgsfield project links or published post URLs into the item's link, and a thumbnail image URL for a preview. Ask about the product before giving specific ideas if you don't know it yet — get its audience, price, and what makes it worth buying, then tailor concepts to that. Be a sharp, practical marketing collaborator, not generic.
 
 You can add calendar events/deadlines with the add_event tool when he asks you to remember a date or set a reminder ("remind me the Fulton tax sale is March 4"). Read back the date you're recording.
 
@@ -375,6 +394,37 @@ router.post('/ask', async (req, res) => {
           required: ['job'],
         },
       },
+      {
+        name: 'add_marketing',
+        description: "Add a marketing content/campaign item to the marketing workflow board. Use when the owner wants to capture an ad idea, campaign, or piece of content to produce. Videos are made in Higgsfield AI externally; store the Higgsfield project link or published post URL in 'link' and a preview image URL in 'thumbnail' if available.",
+        input_schema: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Name of the ad/post/campaign' },
+            product: { type: 'string', description: 'Product being marketed, e.g. Hermie' },
+            channel: { type: 'string', description: 'tiktok, instagram, youtube, facebook, x, or other' },
+            stage: { type: 'string', enum: MKT_STAGES, description: 'Starting stage (default idea)' },
+            script: { type: 'string', description: 'Concept, copy, or script text' },
+            link: { type: 'string', description: 'Higgsfield project or published post URL' },
+            thumbnail: { type: 'string', description: 'Preview image URL' },
+            notes: { type: 'string' },
+          },
+          required: ['title'],
+        },
+      },
+      {
+        name: 'move_marketing',
+        description: 'Move a marketing item to a different workflow stage (idea, scripting, production, ready, posted, parked). Identify by title (fuzzy match) or id.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Title (or part) of the marketing item' },
+            id: { type: 'number' },
+            stage: { type: 'string', enum: MKT_STAGES },
+          },
+          required: ['stage'],
+        },
+      },
     ];
 
     const fetch = (await import('node-fetch')).default;
@@ -446,6 +496,14 @@ router.post('/ask', async (req, res) => {
             return `The ${input.job} job errored: ${e.message}`;
           }
         }
+        if (name === 'add_marketing') {
+          const m = await addMarketing(input);
+          return `Added "${m.title}" to the marketing board at stage "${m.stage}"${m.product ? ` for ${m.product}` : ''}.`;
+        }
+        if (name === 'move_marketing') {
+          const m = await moveMarketing(input);
+          return `Moved "${m.title}" to marketing stage "${m.stage}".`;
+        }
         return `Unknown tool: ${name}`;
       } catch (e) {
         return `Tool error: ${e.message}`;
@@ -462,7 +520,8 @@ router.post('/ask', async (req, res) => {
       const customUses = toolUses.filter(b =>
         b.name === 'add_deal' || b.name === 'move_deal' ||
         b.name === 'add_to_watchlist' || b.name === 'remove_from_watchlist' ||
-        b.name === 'add_event' || b.name === 'save_note' || b.name === 'run_job');
+        b.name === 'add_event' || b.name === 'save_note' || b.name === 'run_job' ||
+        b.name === 'add_marketing' || b.name === 'move_marketing');
       // If the only tool calls are server-side (web_search), nothing for us to do.
       if (customUses.length === 0) break;
 

@@ -16,6 +16,7 @@ const dealsRouter = require('./routes/deals');
 const performanceRouter = require('./routes/performance');
 const eventsRouter = require('./routes/events');
 const notesRouter = require('./routes/notes');
+const marketingRouter = require('./routes/marketing');
 const { startScheduler } = require('./jobs/scheduler');
 
 const app = express();
@@ -45,6 +46,7 @@ app.use('/api/deals', dealsRouter);
 app.use('/api/performance', performanceRouter);
 app.use('/api/events', eventsRouter);
 app.use('/api/notes', notesRouter);
+app.use('/api/marketing', marketingRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

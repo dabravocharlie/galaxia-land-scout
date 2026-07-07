@@ -71,5 +71,9 @@ export const api = {
   getNotes: () => request('/api/notes'),
   addNote: (n) => request('/api/notes', { method: 'POST', body: JSON.stringify(n) }),
   updateNote: (id, u) => request(`/api/notes/${id}`, { method: 'PATCH', body: JSON.stringify(u) }),
-  removeNote: (id) => request(`/api/notes/${id}`, { method: 'DELETE' })
+  removeNote: (id) => request(`/api/notes/${id}`, { method: 'DELETE' }),
+  getMarketing: () => request('/api/marketing'),
+  addMarketing: (m) => request('/api/marketing', { method: 'POST', body: JSON.stringify(m) }),
+  updateMarketing: (id, u) => request(`/api/marketing/${id}`, { method: 'PATCH', body: JSON.stringify(u) }),
+  removeMarketing: (id) => request(`/api/marketing/${id}`, { method: 'DELETE' })
 };

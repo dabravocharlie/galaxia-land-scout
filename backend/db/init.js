@@ -264,6 +264,24 @@ CREATE TABLE IF NOT EXISTS notes (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_notes_updated ON notes(updated_at);
+
+-- Marketing workflow: content/campaign pieces moving through production stages.
+-- Media is referenced by link/thumbnail (Higgsfield project URL, published post
+-- URL, preview image URL) rather than hosted here.
+CREATE TABLE IF NOT EXISTS marketing (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  product TEXT,
+  channel TEXT,
+  stage TEXT NOT NULL DEFAULT 'idea',
+  link TEXT,
+  thumbnail TEXT,
+  script TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_marketing_stage ON marketing(stage);
 `;
 
 async function init() {
