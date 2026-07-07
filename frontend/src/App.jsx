@@ -90,7 +90,26 @@ function LandModule() {
 }
 
 export default function App() {
-  const [tab, setTab] = useState('minerva');
+  const validTabs = TABS.map(t => t.id);
+  const tabFromHash = () => {
+    const h = window.location.hash.replace('#', '');
+    return validTabs.includes(h) ? h : 'minerva';
+  };
+  const [tab, setTabState] = useState(tabFromHash());
+
+  // Keep the tab in sync with the URL hash so each tab is directly linkable
+  // (e.g. .../#marketing) and can be opened in its own window on another screen.
+  useEffect(() => {
+    const onHash = () => setTabState(tabFromHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const setTab = (id) => {
+    if (window.location.hash.replace('#', '') !== id) window.location.hash = id;
+    setTabState(id);
+  };
 
   return (
     <div style={{ minHeight: '100vh', padding: '32px 24px 60px' }}>
@@ -141,34 +160,52 @@ export default function App() {
           </div>
         </header>
 
-        {/* LCARS tab nav — rounded pills, active one glows amber */}
+        {/* LCARS tab nav — rounded pills, active one glows amber. Each pill has
+            a small pop-out button to open that tab in its own window. */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 26, flexWrap: 'wrap' }}>
           {TABS.map((t, idx) => {
             const active = tab === t.id;
             const palette = ['var(--brass)', 'var(--lcars-blue)', 'var(--lcars-gold)', 'var(--lcars-lilac)'];
             const c = palette[idx % palette.length];
+            const popOut = (e) => {
+              e.stopPropagation();
+              const url = `${window.location.origin}${window.location.pathname}#${t.id}`;
+              window.open(url, `galaxia_${t.id}`, 'width=1100,height=800');
+            };
             return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                style={{
-                  background: active ? c : 'var(--ink-raised)',
-                  border: `1px solid ${active ? c : 'var(--ink-line)'}`,
-                  borderRadius: 18,
-                  color: active ? 'var(--ink)' : 'var(--parchment-dim)',
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 14,
-                  fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  padding: '9px 22px',
-                  cursor: 'pointer',
-                  boxShadow: active ? `0 0 16px ${c}` : 'none',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {t.label}
-              </button>
+              <div key={t.id} style={{
+                display: 'flex', alignItems: 'stretch',
+                background: active ? c : 'var(--ink-raised)',
+                border: `1px solid ${active ? c : 'var(--ink-line)'}`,
+                borderRadius: 18, overflow: 'hidden',
+                boxShadow: active ? `0 0 16px ${c}` : 'none',
+                transition: 'all 0.15s ease',
+              }}>
+                <button
+                  onClick={() => setTab(t.id)}
+                  style={{
+                    background: 'transparent', border: 'none',
+                    color: active ? 'var(--ink)' : 'var(--parchment-dim)',
+                    fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700,
+                    letterSpacing: '0.08em', textTransform: 'uppercase',
+                    padding: '9px 14px 9px 22px', cursor: 'pointer',
+                  }}
+                >
+                  {t.label}
+                </button>
+                <button
+                  onClick={popOut}
+                  title={`Open ${t.label} in a new window`}
+                  style={{
+                    background: 'transparent', border: 'none',
+                    borderLeft: `1px solid ${active ? 'rgba(0,0,0,0.25)' : 'var(--ink-line)'}`,
+                    color: active ? 'var(--ink)' : 'var(--parchment-dim)',
+                    fontSize: 13, cursor: 'pointer', padding: '0 10px', lineHeight: 1,
+                  }}
+                >
+                  ⇱
+                </button>
+              </div>
             );
           })}
         </div>
