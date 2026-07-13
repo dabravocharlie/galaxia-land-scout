@@ -2,6 +2,7 @@
 // Run once to set up the database schema: npm run db:init
 const { Pool } = require('pg');
 require('dotenv').config();
+const { RESEARCH_SCHEMA } = require('./research-schema');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
