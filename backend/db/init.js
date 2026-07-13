@@ -289,7 +289,7 @@ async function init() {
   const client = await pool.connect();
   try {
     console.log('Running schema...');
-    await client.query(SCHEMA);
+    await client.query(RESEARCH_SCHEMA);
     console.log('✅ Database schema initialized successfully.');
   } catch (err) {
     console.error('❌ Error initializing schema:', err);
