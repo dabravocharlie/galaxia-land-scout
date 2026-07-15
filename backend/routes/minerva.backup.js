@@ -52,59 +52,6 @@ async function removeFromWatchlist(ticker) {
   return t;
 }
 
-// --- research engine helpers (append-only by design) ---
-async function registerHypothesis(input) {
-  const { domain, statement, prediction, kill_criterion, data_range, holdout_range } = input;
-  if (!domain || !statement || !prediction || !kill_criterion) {
-    throw new Error('domain, statement, prediction, and kill_criterion are all required');
-  }
-  const r = await pool.query(
-    `INSERT INTO hypotheses (domain, statement, prediction, kill_criterion, data_range, holdout_range)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id, domain, statement, status`,
-    [domain, statement, prediction, kill_criterion, data_range || null, holdout_range || null]
-  );
-  return r.rows[0];
-}
-
-async function logResult(input) {
-  const { hypothesis_id, parameters, metrics, is_holdout, notes } = input;
-  if (!hypothesis_id) throw new Error('hypothesis_id is required');
-  const h = await pool.query('SELECT id, status FROM hypotheses WHERE id = $1', [hypothesis_id]);
-  if (h.rows.length === 0) throw new Error(`No hypothesis with id ${hypothesis_id}`);
-  if (h.rows[0].status !== 'open') {
-    throw new Error(`Hypothesis ${hypothesis_id} is already ${h.rows[0].status} — open a new hypothesis rather than adding results to a closed one`);
-  }
-  const r = await pool.query(
-    `INSERT INTO hypothesis_results (hypothesis_id, parameters, metrics, is_holdout, notes)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, is_holdout`,
-    [hypothesis_id, parameters ? JSON.stringify(parameters) : null,
-     metrics ? JSON.stringify(metrics) : null, is_holdout === true, notes || null]
-  );
-  return r.rows[0];
-}
-
-async function adjudicateHypothesis(input) {
-  const { hypothesis_id, verdict, verdict_notes } = input;
-  if (!['confirmed', 'falsified', 'abandoned'].includes(verdict)) {
-    throw new Error('verdict must be confirmed, falsified, or abandoned');
-  }
-  const h = await pool.query('SELECT id, status FROM hypotheses WHERE id = $1', [hypothesis_id]);
-  if (h.rows.length === 0) throw new Error(`No hypothesis with id ${hypothesis_id}`);
-  if (h.rows[0].status !== 'open') {
-    throw new Error(`Hypothesis ${hypothesis_id} already has a verdict (${h.rows[0].status}) and can't be re-judged`);
-  }
-  const r = await pool.query(
-    `UPDATE hypotheses
-     SET status = $1, verdict_notes = $2, adjudicated_at = NOW()
-     WHERE id = $3
-     RETURNING id, statement, status`,
-    [verdict, verdict_notes || null, hypothesis_id]
-  );
-  return r.rows[0];
-}
-
 const MODEL = 'claude-sonnet-4-6';
 
 // Build a compact, actionable snapshot of the whole command center. We pull
@@ -478,50 +425,6 @@ router.post('/ask', async (req, res) => {
           required: ['stage'],
         },
       },
-      {
-        name: 'register_hypothesis',
-        description: "Register a research hypothesis BEFORE testing it. Use when the owner wants to formally test an idea. You must capture a specific prediction and a kill-criterion (the result that would prove it wrong) up front — these are locked and cannot be changed later. If the owner gives a vague prediction like 'it'll do better', ask what number would count as passing and what would count as failure before registering.",
-        input_schema: {
-          type: 'object',
-          properties: {
-            domain: { type: 'string', enum: ['markets', 'land', 'business', 'other'] },
-            statement: { type: 'string', description: 'The claim being tested, plainly stated' },
-            prediction: { type: 'string', description: 'Specific, measurable expected outcome. LOCKED once set.' },
-            kill_criterion: { type: 'string', description: 'The specific result that would falsify this. LOCKED once set.' },
-            data_range: { type: 'string', description: 'The in-sample data the test will use' },
-            holdout_range: { type: 'string', description: 'The sealed out-of-sample data' },
-          },
-          required: ['domain', 'statement', 'prediction', 'kill_criterion'],
-        },
-      },
-      {
-        name: 'log_result',
-        description: "Append a result to an existing registered hypothesis, identified by id. Record the parameters used and the metrics observed. Set is_holdout to true ONLY for the final run against sealed out-of-sample data. This only appends — it can never change the hypothesis's prediction or kill-criterion.",
-        input_schema: {
-          type: 'object',
-          properties: {
-            hypothesis_id: { type: 'number', description: 'The id of the registered hypothesis' },
-            parameters: { type: 'object', description: 'Parameters for this run, e.g. {"ConfirmBars": 3}' },
-            metrics: { type: 'object', description: 'Results, e.g. {"pf": 1.05, "trades": 1630, "max_dd": 12904}' },
-            is_holdout: { type: 'boolean', description: 'True only for the final sealed-data run' },
-            notes: { type: 'string' },
-          },
-          required: ['hypothesis_id'],
-        },
-      },
-      {
-        name: 'adjudicate_hypothesis',
-        description: "Deliver a verdict on a hypothesis by comparing ALL its logged results against the kill-criterion it was registered with. Judge against what was predicted up front, not a story rewritten after the fact. If there are too few results to judge, leave it open rather than force a verdict.",
-        input_schema: {
-          type: 'object',
-          properties: {
-            hypothesis_id: { type: 'number' },
-            verdict: { type: 'string', enum: ['confirmed', 'falsified', 'abandoned'] },
-            verdict_notes: { type: 'string', description: 'Why, referencing the kill-criterion and the results' },
-          },
-          required: ['hypothesis_id', 'verdict', 'verdict_notes'],
-        },
-      },
     ];
 
     const fetch = (await import('node-fetch')).default;
@@ -601,18 +504,6 @@ router.post('/ask', async (req, res) => {
           const m = await moveMarketing(input);
           return `Moved "${m.title}" to marketing stage "${m.stage}".`;
         }
-        if (name === 'register_hypothesis') {
-          const h = await registerHypothesis(input);
-          return `Registered hypothesis #${h.id} in ${h.domain}: "${h.statement}". Prediction and kill-criterion are now locked. Log results against id ${h.id} as you run them.`;
-        }
-        if (name === 'log_result') {
-          const r = await logResult(input);
-          return `Logged result #${r.id} to hypothesis #${input.hypothesis_id}${r.is_holdout ? ' (HOLDOUT — sealed-data run)' : ''}.`;
-        }
-        if (name === 'adjudicate_hypothesis') {
-          const h = await adjudicateHypothesis(input);
-          return `Hypothesis #${h.id} adjudicated: ${h.status}. "${h.statement}"`;
-        }
         return `Unknown tool: ${name}`;
       } catch (e) {
         return `Tool error: ${e.message}`;
@@ -630,9 +521,7 @@ router.post('/ask', async (req, res) => {
         b.name === 'add_deal' || b.name === 'move_deal' ||
         b.name === 'add_to_watchlist' || b.name === 'remove_from_watchlist' ||
         b.name === 'add_event' || b.name === 'save_note' || b.name === 'run_job' ||
-        b.name === 'add_marketing' || b.name === 'move_marketing' ||
-        b.name === 'register_hypothesis' || b.name === 'log_result' ||
-        b.name === 'adjudicate_hypothesis');
+        b.name === 'add_marketing' || b.name === 'move_marketing');
       // If the only tool calls are server-side (web_search), nothing for us to do.
       if (customUses.length === 0) break;
 
